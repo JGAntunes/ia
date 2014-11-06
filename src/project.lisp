@@ -1,3 +1,8 @@
+
+;;;;;;;;;;;;;EXEMPLOS;;;;;;;;;;;;;
+(load "exemplos.fas")
+;(load (compile-file "testes publicos/exemplos.lisp"))
+
 (defstruct (restricao 
             (:constructor cria-restricao (variaveis funcao-validacao)))
 	variaveis
@@ -13,7 +18,7 @@
 )
 
 
-; devolve valor do par cuja variavel é = à variavel de input
+; devolve valor do par cuja variavel e = a variavel de input
 (defun valor-lista-pares (variavel lista-pares)
   	(cond ((null lista-pares) nil)
         ((equal variavel (car (first lista-pares))) (cdr (first lista-pares)))
@@ -21,7 +26,14 @@
 	)
 )
 
-; verifica se a variavel pertence à lista
+(defun not-valor-lista-pares (variavel lista-pares)
+    (cond ((null lista-pares) t)
+        ((equal variavel (car (first lista-pares))) nil)
+        (t (valor-lista-pares variavel (rest lista-pares)))
+  )
+)
+
+; verifica se a variavel pertence a lista
 (defun pertence-lista (variavel lista)
   	(cond ((null lista) nil)
         ((equal variavel (first lista)) t)
@@ -29,8 +41,15 @@
 	)
 )
 
-;compara 2 listas através de um predicado. A lista devolvida é o resultado da aplicação do predicado aos elementos da lista1
-;sobre a lista2. Sempre que este falhe os elementos não são incluídos na lista de resultado
+(defun pertence-restricao (restricao lista)
+  (cond ((null lista) nil)
+      ((pertence-lista (first lista) (restricao-variaveis restricao)) t)
+      (t (pertence-restricao restricao (rest lista)))
+  )
+)
+
+;compara 2 listas atraves de um predicado. A lista devolvida e o resultado da aplicacao do predicado aos elementos da lista1
+;sobre a lista2. Sempre que este falhe os elementos nao sao incluidos na lista de resultado
 (defun compara-listas (lista1 lista2 predicado)
 	(cond ((null lista1) nil)
     	((funcall predicado (first lista1) lista2) (append (list (first lista1)) (compara-listas (rest lista1) lista2 predicado)))
@@ -62,7 +81,7 @@
 	)
 )
 
-;remove o par 
+;remove o par cujo primeiro elemento e igual a variavel dada
 (defun remove-lista-pares (variavel lista-pares)
   	(cond ((null lista-pares) nil)
         ((equal variavel (car (first lista-pares))) (rest lista-pares))
@@ -71,7 +90,7 @@
 )
 
 (defun psr-variaveis-nao-atribuidas (p)
-  	(compara-listas (psr-variaveis-todas p) (psr-atribuicoes p) #'valor-lista-pares)
+  (compara-listas (psr-variaveis-todas p) (psr-atribuicoes p) #'not-valor-lista-pares)
 )
 
 (defun psr-variavel-valor (p variavel)
@@ -83,7 +102,7 @@
 )
 
 (defun psr-variavel-restricoes (p variavel)
-	(compara-listas (psr-restricoes p) (list variavel) #'pertence-lista)  
+	(compara-listas (psr-restricoes p) (list variavel) #'pertence-restricao)
 )
 
 (defun psr-adiciona-atribuicao! (p variavel valor)
@@ -102,10 +121,29 @@
 	(not (psr-variaveis-nao-atribuidas p))  
 )
 
-;(defun psr-consistente-p (p)
-;  	(let ((count 0))
-;		(apply #'and 
-;         	(mapcar #'(lambda (restricao) 
-;                (funcall (restricao-funcao-validacao restricao) p))  (psr-restricoes p)))
-;  	)  
-;)
+(defun psr-consistente-p (p)
+  	(let ((count 0))
+		(values (every #'identity 
+         	(mapcar #'(lambda (restricao) 
+              (incf count)
+              (funcall (restricao-funcao-validacao restricao) p))
+          (psr-restricoes p)))
+    count))
+)
+
+(defun psr-variavel-consistente-p (p variavel)
+    (let ((count 0))
+    (values (every #'identity 
+          (mapcar #'(lambda (restricao) 
+              (incf count)
+              (funcall (restricao-funcao-validacao restricao) p))
+          (psr-variavel-restricoes p variavel)))
+    count))
+)
+
+;(defun psr-atribuicao-consistente-p (p variavel valor) ())
+
+;(defun psr-atribuicoes-consistentes-arco-p (p variavel1 valor1 variavel2 valor2) ())
+
+;;;;;;;;;;;;;TEST;;;;;;;;;;;;;;;;;
+;(load "testes publicos/test04/input")
