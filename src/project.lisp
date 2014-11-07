@@ -26,10 +26,10 @@
 	)
 )
 
-(defun not-valor-lista-pares (variavel lista-pares)
+(defun not-lista-pares (variavel lista-pares)
     (cond ((null lista-pares) t)
         ((equal variavel (car (first lista-pares))) nil)
-        (t (valor-lista-pares variavel (rest lista-pares)))
+        (t (not-lista-pares variavel (rest lista-pares)))
   )
 )
 
@@ -89,8 +89,15 @@
 	)
 )
 
+(defun aplica-restricoes (p lista-restricoes count)
+    (cond ((null lista-restricoes) (values t count))
+        ((funcall (restricao-funcao-validacao (first lista-restricoes)) p) (aplica-restricoes p (rest lista-restricoes) (incf count)))
+        (t (values nil (incf count)))
+    )
+)
+
 (defun psr-variaveis-nao-atribuidas (p)
-  (compara-listas (psr-variaveis-todas p) (psr-atribuicoes p) #'not-valor-lista-pares)
+  (compara-listas (psr-variaveis-todas p) (psr-atribuicoes p) #'not-lista-pares)
 )
 
 (defun psr-variavel-valor (p variavel)
@@ -122,26 +129,23 @@
 )
 
 (defun psr-consistente-p (p)
-  	(let ((count 0))
-		(values (every #'identity 
-         	(mapcar #'(lambda (restricao) 
-              (incf count)
-              (funcall (restricao-funcao-validacao restricao) p))
-          (psr-restricoes p)))
-    count))
+  (aplica-restricoes p (psr-restricoes p) 0)
 )
 
 (defun psr-variavel-consistente-p (p variavel)
-    (let ((count 0))
-    (values (every #'identity 
-          (mapcar #'(lambda (restricao) 
-              (incf count)
-              (funcall (restricao-funcao-validacao restricao) p))
-          (psr-variavel-restricoes p variavel)))
-    count))
+  (aplica-restricoes p (psr-variavel-restricoes p variavel) 0)
 )
 
-;(defun psr-atribuicao-consistente-p (p variavel valor) ())
+(defun psr-atribuicao-consistente-p (p variavel valor)
+    (let ((valor-original (psr-variavel-valor p variavel)))
+          (psr-adiciona-atribuicao! p variavel valor)
+          (multiple-value-bind (result-p result-n) (psr-variavel-consistente-p p variavel)
+            (cond ((null valor-original) (psr-remove-atribuicao! p variavel))
+                  ((not (equal valor  valor-original)) (psr-adiciona-atribuicao! p variavel valor-original)))
+            (values result-p result-n)
+          )
+    )
+)
 
 ;(defun psr-atribuicoes-consistentes-arco-p (p variavel1 valor1 variavel2 valor2) ())
 
