@@ -1,8 +1,14 @@
+;GRUPO ALAMEDA 36 (al036)
+;Nome: Joao Farinha Numero: 75667
+;Nome: Joao Antunes Numero: 75993
+;Nome: Diogo Rodrigues Numero: 77214
 
-;;;;;;;;;;;;;EXEMPLOS;;;;;;;;;;;;;
+;;;;;;;;;;;;;;EXEMPLOS;;;;;;;;;;;;;;
 (load "exemplos.fas")
 ;(load (compile-file "testes publicos/exemplos.lisp"))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;ESTRUTURAS;;;;;;;;;;;;;
 (defstruct (restricao 
             (:constructor cria-restricao (variaveis funcao-validacao)))
 	variaveis
@@ -17,7 +23,7 @@
   atribuicoes
 )
 
-
+;;;;;;;;;;;;AUX_FUNCS;;;;;;;;;;;;;;;
 ; devolve valor do par cuja variavel e = a variavel de input
 (defun valor-lista-pares (variavel lista-pares)
 	(cond ((null lista-pares) nil)
@@ -43,7 +49,7 @@
 
 (defun pertence-restricao (restricao lista)
   (cond ((null lista) t)
-    ((pertence-lista (first lista) (restricao-variaveis restricao)) (and t (pertence-restricao restricao (rest lista))))
+    ((pertence-lista (first lista) (restricao-variaveis restricao)) (pertence-restricao restricao (rest lista)))
     (t nil)
   )
 )
@@ -96,6 +102,50 @@
   )
 )
 
+(defun cria-variavel (linha coluna)
+  (concatenate 'string "l" (write-to-string linha) "c" (write-to-string coluna))
+)
+
+(defun cria-predicado (valor-restricao variaveis)
+  (let ((num0 0)
+    (num1 0)
+    (valor nil)
+    (max-num0 (abs (- (list-length variaveis) valor-restricao)))
+    (max-num1 valor-restricao)
+    (variaveis variaveis))
+  #'(lambda (psr)
+      (setf num0 0)
+      (setf num1 0)
+      (dolist (variavel variaveis t)
+        (setf valor (psr-variavel-valor psr variavel))
+        (cond ((equal valor 0) (incf num0) (when (> num0 max-num0) (return nil)))
+          ((equal valor 1) (incf num1) (when (> num1 max-num1) (return nil)))
+        )
+      )
+    )
+  )  
+)
+
+
+(defun nova-restricao (linha coluna valor limite-linha limite-coluna)
+  (let ((lista-vars ()))
+    (do ((x  (- linha 1) (incf x)))
+      ((> x (+ linha 1)) nil)
+      (cond ((or (> x  (- limite-linha 1)) (< x 0)) nil)
+        (t (do ((y  (- coluna 1) (incf y)))
+            ((> y (+ coluna 1)) nil)
+            (cond ((or (> y  (- limite-coluna 1)) (< y 0)) nil)
+              (t (setf lista-vars (append lista-vars (list (cria-variavel x y)))))
+            )
+          )
+        )
+      ) 
+    )
+    (cria-restricao lista-vars (cria-predicado valor lista-vars))  
+  )  
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;REAL_DEAL;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun psr-variaveis-nao-atribuidas (p)
   (compara-listas (psr-variaveis-todas p) (psr-atribuicoes p) #'not-lista-pares)
 )
@@ -163,48 +213,6 @@
   )
 )
 
-(defun cria-variavel (linha coluna)
-  (concatenate 'string "l" (write-to-string linha) "c" (write-to-string coluna))
-)
-
-(defun cria-predicado (valor-restricao variaveis)
-  (let ((max-num0 (- 9 valor-restricao))
-    (max-num1 valor-restricao)
-    (variaveis variaveis))
-  #'(lambda (psr)
-      (let ((num0 0)
-        (num1 0)
-        (valor nil))
-        (dolist (variavel variaveis t)
-          (setf valor (psr-variavel-valor psr variavel))
-          (cond ((equal valor 0) (incf num0) (when (> num0 max-num0) (return nil)))
-            ((equal valor 1) (incf num1) (when (> num1 max-num1) (return nil)))
-          )
-        )
-      )
-    )  
-  )
-)
-
-
-(defun nova-restricao (linha coluna valor limite-linha limite-coluna)
-  (let ((lista-vars ()))
-    (do ((x  (- linha 1) (incf x)))
-      ((> x (+ linha 1)) nil)
-      (cond ((or (> linha  limite-linha) (< linha 0)) nil)
-        (t (do ((y  (- coluna 1) (incf y)))
-            ((> y (+ coluna 1)) nil)
-            (cond ((or (> coluna  limite-coluna) (< coluna 0)) nil)
-              (t (setf lista-vars (append lista-vars (list (cria-variavel x y)))))
-            )
-          )
-        )
-      ) 
-    )
-    (cria-restricao lista-vars (cria-predicado valor lista-vars))  
-  )  
-)
-
 (defun fill-a-pix->psr (array)
   (let ((lista-vars ())
     (lista-restricoes ())
@@ -230,20 +238,34 @@
   )
 )
 
-;(defun retrocesso-simples (psr)
-;  (let (()))
-;  (cond ((psr-completo-p psr) RETURN STUFF)
-;    (t (let ((variavel (first (psr-variaveis-nao-atribuidas psr))))
-;      (dolist (valor (psr-variavel-dominio psr variavel) t)
-;        (cond ((psr-atribuicao-consistente-p psr variavel valor) (psr-adiciona-atribuicao psr variavel valor) (retrocesso-simples psr)))
-;      ))
-;    )
-;  )  
-;)
-;
-;(defun procura-retrocesso-simples (psr)
-;  
-;)
+(defun procura-retrocesso-simples (psr)
+  (let ((result-num 0)
+    (variavel nil))
+    (cond ((psr-completo-p psr) (values psr result-num))
+      (t (setf variavel (first (psr-variaveis-nao-atribuidas psr))) 
+        (dolist (valor (psr-variavel-dominio psr variavel) (values nil result-num))
+          (multiple-value-bind (result-p result-num-aux) (psr-atribuicao-consistente-p psr variavel valor)
+            (incf result-num result-num-aux)
+            (cond (result-p
+                (psr-adiciona-atribuicao! psr variavel valor)
+                (multiple-value-bind (result-p-aux result-num-aux) (procura-retrocesso-simples psr)
+                  (incf result-num result-num-aux)
+                  (cond (result-p-aux (return (values psr result-num)))
+                    (t (psr-remove-atribuicao! psr variavel))
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )  
+)
 
-;;;;;;;;;;;;;TEST;;;;;;;;;;;;;;;;;
-;(load "testes publicos/test04/input")
+(defun resolve-simples (array)
+  (multiple-value-bind (psr unwanted) (procura-retrocesso-simples (fill-a-pix->psr array))
+    (declare (ignore unwanted))
+    (psr->fill-a-pix (procura-retrocesso-simples psr) (array-dimension array 0) (array-dimension array 1))
+  )
+)
