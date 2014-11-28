@@ -4,8 +4,8 @@
 ;Nome: Diogo Rodrigues Numero: 77214
 
 ;;;;;;;;;;;;;;EXEMPLOS;;;;;;;;;;;;;;
-;(load "exemplos.fas")
-(load (compile-file "testes publicos/exemplos.lisp"))
+(load "exemplos.fas")
+;(load (compile-file "testes publicos/exemplos.lisp"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;ESTRUTURAS;;;;;;;;;;;;;
@@ -13,6 +13,12 @@
             (:constructor cria-restricao (variaveis funcao-validacao)))
   variaveis
   funcao-validacao
+)
+
+(defstruct (inferencia
+            (:constructor cria-inefrencia (variavel dominio)))
+  variavel
+  dominio  
 )
 
 (defstruct (psr 
@@ -79,6 +85,13 @@
   )  
 )
 
+(defun adiciona-elemento-lista (variavel valor lista)
+  (cond ((null lista) (list valor))
+    ((equal variavel (first lista)) (append (list valor) (rest lista)))
+    (t (append (list (first lista)) (adiciona-elemento-lista variavel valor (rest lista))))
+  )  
+)
+
 ;adiciona o par variavel valor a lista de pares, ou susbtitui caso a variavel ja esteja atribuida
 (defun adiciona-lista-pares (variavel valor lista-pares)
   (cond ((null lista-pares) (list (cons variavel valor)))
@@ -92,6 +105,13 @@
   (cond ((null lista-pares) nil)
     ((equal variavel (car (first lista-pares))) (rest lista-pares))
     (t (append (list (first lista-pares)) (remove-lista-pares variavel (rest lista-pares))))
+  )
+)
+
+(defun remove-lista (variavel lista)
+  (cond ((null lista) nil)
+    ((equal variavel (first lista)) (rest lista))
+    (t (append (list (first lista)) (remove-lista variavel (rest lista))))
   )
 )
 
@@ -274,33 +294,117 @@
   (stable-sort (psr-variaveis-nao-atribuidas psr) #'> 
     :key #'(lambda (var) 
       (let ((restricoes (psr-variavel-restricoes psr var))
-        (result 0)
-        (pred nil))
+        (result 0))
         (dolist (restricao restricoes result)
           (when 
-            ((dolist (var-restricao (restricao-variaveis restricao) pred)
+            (dolist (var-restricao (restricao-variaveis restricao))
               (when (and (null (psr-variavel-valor psr var-restricao)) (not (equal var-restricao var)))
-                (setf pred t)
-                (return)
+                (return t)
               )
-          )) (incf result)) 
+          ) (incf result))
         )
       )
     )
   ) 
 )
 
-(defun procura-retrocesso-grau-aux (psr vars)
+(defun heuristica-mrv (psr)
+  (stable-sort (psr-variaveis-nao-atribuidas psr) #'< 
+    :key #'(lambda (var) 
+      (list-length (psr-variavel-dominio psr var))
+    )
+  ) 
+)
+
+(defun envolvida-restricao (psr var1 var2)
+  (dolist (restricao (psr-variavel-restricoes psr var1))
+    (when (pertence-restricao restricao (list var2)) (return t))
+  ) 
+)
+
+(defun arcos-vizinhos-nao-atribuidos (psr var)
+  (let ((lista-arcos nil))
+    (dolist (var-natribuida (psr-variaveis-nao-atribuidas psr) lista-arcos)
+      (when (not (equal var var-natribuida))
+        (when (envolvida-restricao psr var var-natribuida)
+          (append lista-arcos (list (list var-natribuida var)))
+        )
+      )
+    )
+  )
+)
+
+(defun inferencia-variavel-dominio (inferencias var)
+  (dolist (inferencia inferencias)
+    (when (equal var (inferencia-variavel inferencia)) (return (inferencia-dominio inferencia)))
+  )
+)
+
+(defun revise (psr v1 v2 inferencias)
+  (let ((result-num 0)
+    (dominio-v1 (inferencia-variavel-dominio inferencias v1))
+    (novo-dominio-v1 nil)
+    (dominio-v2 nil))
+    (setf novo-dominio-v1 dominio-v1)
+    (when (null dominio-v1) 
+      (setf dominio-v1 (psr-variavel-dominio psr v1))
+      (setf novo-dominio-v1 dominio-v1)
+    )
+    (setf dominio-v2 (psr-variavel-valor psr v2))
+    (when (null dominio-v2)
+      (setf dominio-v2 (inferencia-variavel-dominio inferencias v2))
+      (when (null dominio-v2)
+        (setf dominio-v2 (psr-variavel-dominio psr v2))
+      )
+    )
+    (cond ((dolist (valor-dominio-v1 dominio-v1)
+      (when (not (dolist (valor-dominio-v2 dominio-v2)
+        (multiple-value-bind (result-p result-num-aux) (psr-atribuicoes-consistentes-arco-p psr v1 valor-dominio-v1 v2 valor-dominio-v2)
+          (incf result-num result-num-aux)
+          (when result-p
+            (return t)
+          )
+        )))
+        (remove-lista v1 novo-dominio-v1)
+        (return t)
+      ))
+      (setf inferencias (adiciona-elemento-lista v1 novo-dominio-v1 inferencias))
+      (values t result-num)
+    )
+    (t (values nil result-num)))
+  )
+)
+
+(defun foward-checking (psr var)
+  (let ((result-num 0)
+    (inferencias nil)
+    (lista-arcos (arcos-vizinhos-nao-atribuidos psr var)))
+    (cond ((dolist (arco lista-arcos t)
+      (multiple-value-bind (result-p result-num-aux) (revise psr (car arco) (cdr arco) inferencias)
+        (incf result-num result-num-aux)
+        (when result-p
+          (when (= (list-length (inferencia-variavel-dominio inferencias (cdr arco))) 0)
+            (return nil)
+          )
+        )
+      )
+    ) (values inferencias result-num))
+    (t (values nil result-num)))
+  )
+)
+
+;rever heuristica que e recalculada todas as chamadas
+(defun procura-retrocesso-grau (psr)
   (let ((result-num 0)
     (variavel nil))
     (cond ((psr-completo-p psr) (values psr result-num))
-      (t (setf variavel (first vars)) 
+      (t (setf variavel (first (heuristica-grau psr))) 
         (dolist (valor (psr-variavel-dominio psr variavel) (values nil result-num))
           (multiple-value-bind (result-p result-num-aux) (psr-atribuicao-consistente-p psr variavel valor)
             (incf result-num result-num-aux)
             (cond (result-p
                 (psr-adiciona-atribuicao! psr variavel valor)
-                (multiple-value-bind (result-p-aux result-num-aux) (procura-retrocesso-grau-aux psr (rest vars))
+                (multiple-value-bind (result-p-aux result-num-aux) (procura-retrocesso-grau psr)
                   (incf result-num result-num-aux)
                   (cond (result-p-aux (return (values psr result-num)))
                     (t (psr-remove-atribuicao! psr variavel))
@@ -315,6 +419,35 @@
   )
 )
 
-(defun procura-retrocesso-grau (psr)
-  (procura-retrocesso-grau-aux psr (heuristica-grau psr))
-)
+;(defun procura-retrocesso-fc-mrv (psr)
+;  (let ((result-num 0)
+;    (variavel nil))
+;    (cond ((psr-completo-p psr) (values psr result-num))
+;      (t (setf variavel (first (heuristica-mrv psr))) 
+;        (dolist (valor (psr-variavel-dominio psr variavel) (values nil result-num))
+;          (multiple-value-bind (result-p result-num-aux) (psr-atribuicao-consistente-p psr variavel valor)
+;            (incf result-num result-num-aux)
+;            (cond (result-p
+;                (psr-adiciona-atribuicao! psr variavel valor)
+;                
+;                (multiple-value-bind (result-p-aux result-num-aux) (foward-checking psr variavel valor)
+;                  (incf result-num result-num-aux)
+;                  (cond (result-p-aux
+;                    )
+;                  )
+;                )
+;                
+;                (multiple-value-bind (result-p-aux result-num-aux) (procura-retrocesso-fc-mrv psr)
+;                  (incf result-num result-num-aux)
+;                  (cond (result-p-aux (return (values psr result-num)))
+;                    (t (psr-remove-atribuicao! psr variavel))
+;                  )
+;                )
+;              )
+;            )
+;          )
+;        )
+;      )
+;    )
+;  )
+;)
