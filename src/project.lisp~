@@ -44,7 +44,6 @@
   )
 )
 
-;verifica se a variavel nao pertence a lista
 (defun not-lista-pares (variavel lista-pares)
   (cond ((null lista-pares) t)
     ((equal variavel (car (first lista-pares))) nil)
@@ -60,7 +59,6 @@
   )
 )
 
-;verifica se a variavel esta na lista de variaveis da restricao
 (defun pertence-restricao (restricao lista)
   (cond ((null lista) t)
     ((pertence-lista (first lista) (restricao-variaveis restricao)) (pertence-restricao restricao (rest lista)))
@@ -109,7 +107,6 @@
   )
 )
 
-;remove a variavel da lista
 (defun remove-lista (variavel lista)
   (cond ((null lista) nil)
     ((equal variavel (first lista)) (rest lista))
@@ -117,7 +114,6 @@
   )
 )
 
-;aplica a lista de restricoes ao psr
 (defun aplica-restricoes (p lista-restricoes count)
   (cond ((null lista-restricoes) (values t count))
     ((funcall (restricao-funcao-validacao (first lista-restricoes)) p) (aplica-restricoes p (rest lista-restricoes) (incf count)))
@@ -125,11 +121,9 @@
   )
 )
 
-
 (defun cria-variavel (linha coluna)
   (concatenate 'string "l" (write-to-string linha) "c" (write-to-string coluna))
 )
-
 
 (defun cria-predicado (valor-restricao variaveis)
   (let ((num0 0)
@@ -314,7 +308,6 @@
   ) 
 )
 
-;verifica se a segunda variavel esta envolvida na lista de restricoes da primeira
 (defun envolvida-restricao (psr var1 var2)
   (dolist (restricao (psr-variavel-restricoes psr var1))
     (when (pertence-restricao restricao (list var2)) (return t))
@@ -333,7 +326,6 @@
   )
 )
 
-;
 (defun inferencia-variavel-dominio (inferencias var)
   (dolist (inferencia inferencias)
     (when (equal var (inferencia-variavel inferencia)) (return (inferencia-dominio inferencia)))
@@ -390,7 +382,6 @@
   )
 )
 
-;
 (defun funcao-inferencias (psr var funcao-altera-arcos)
   (let ((result-num 0)
     (inferencias nil))
@@ -419,7 +410,6 @@
   (funcao-inferencias psr var nil)
 )
 
-;
 (defun altera-arcos (arco novos-arcos lista-arcos)
   (setf novos-arcos (remove-lista (list (second arco) (first arco)) novos-arcos))
   (setf lista-arcos (append lista-arcos novos-arcos))
@@ -430,6 +420,7 @@
   (funcao-inferencias psr var #'altera-arcos)
 )
 
+;rever heuristica que e recalculada todas as chamadas
 (defun procura-retrocesso-grau (psr)
   (let ((result-num 0)
     (variavel nil))
