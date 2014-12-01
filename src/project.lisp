@@ -4,8 +4,8 @@
 ;Nome: Diogo Rodrigues Numero: 77214
 
 ;;;;;;;;;;;;;;EXEMPLOS;;;;;;;;;;;;;;
-(load "exemplos.fas")
-;(load (compile-file "testes publicos/exemplos.lisp"))
+;(load "exemplos.fas")
+(load (compile-file "testes publicos/exemplos.lisp"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;ESTRUTURAS;;;;;;;;;;;;;
@@ -341,7 +341,7 @@
 )
 
 (defun  altera-dominio (psr inferencias)
-  (let ((vars (psr-variaveis-todas))
+  (let ((vars (psr-variaveis-todas psr))
         (var nil)
         (dominios-novo nil)
         (dominios-original nil))
@@ -355,8 +355,8 @@
         )
       ) (append dominios-novo dominio))  
     )
-    (setf psr-dominio dominios-novo)
-    (values dominio-original)
+    (setf (psr-dominio psr) dominios-novo)
+    (values dominios-original)
   )
 )
 
@@ -395,7 +395,7 @@
   )
 )
 
-(defun foward-checking (psr var)
+(defun forward-checking (psr var)
   (let ((result-num 0)
     (inferencias nil)
     (lista-arcos (arcos-vizinhos-nao-atribuidos psr var)))
@@ -451,7 +451,7 @@
             (cond (result-p
                 (psr-adiciona-atribuicao! psr variavel valor)
                 
-                (multiple-value-bind (result-p-fd result-num-fd) (foward-checking psr variavel valor)
+                (multiple-value-bind (result-p-fd result-num-fd) (forward-checking psr variavel)
                   (incf result-num result-num-fd)
                   (cond (result-p-fd
                     (setf dominios-aux (altera-dominio psr result-p-fd))
