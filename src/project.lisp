@@ -4,8 +4,8 @@
 ;Nome: Diogo Rodrigues Numero: 77214
 
 ;;;;;;;;;;;;;;EXEMPLOS;;;;;;;;;;;;;;
-;(load "exemplos.fas")
-(load (compile-file "testes publicos/exemplos.lisp"))
+(load "exemplos.fas")
+;(load (compile-file "testes publicos/exemplos.lisp"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;ESTRUTURAS;;;;;;;;;;;;;
@@ -282,6 +282,29 @@
   )  
 )
 
+(defun compara-mrv-grau (psr var1 var2)
+  (let ((key-grau #'(lambda (var)
+      (let ((restricoes (psr-variavel-restricoes psr var))
+        (result 0))
+        (dolist (restricao restricoes result)
+          (when 
+            (dolist (var-restricao (restricao-variaveis restricao))
+              (when (and (null (psr-variavel-valor psr var-restricao)) (not (equal var-restricao var)))
+                (return t)
+              )
+          ) (incf result))
+        )
+      )
+    ))
+    (key-mrv #'(lambda (var)
+      (list-length (psr-variavel-dominio psr var))
+    )))
+    (cond ((= (funcall key-mrv var1) (funcall key-mrv var2)) (> (funcall key-grau var1) (funcall key-grau var2)))
+      (t nil)
+    )
+  )      
+)
+
 (defun heuristica-grau (psr)
   (stable-sort (psr-variaveis-nao-atribuidas psr) #'> 
     :key #'(lambda (var) 
@@ -306,6 +329,33 @@
       (list-length (psr-variavel-dominio psr var))
     )
   ) 
+)
+
+(defun heuristica-mrv-grau (psr)
+  (stable-sort (psr-variaveis-nao-atribuidas psr)
+    #'(lambda (var1 var2)
+      (let ((key-grau #'(lambda (var)
+          (let ((restricoes (psr-variavel-restricoes psr var))
+            (result 0))
+            (dolist (restricao restricoes result)
+              (when 
+                (dolist (var-restricao (restricao-variaveis restricao))
+                  (when (and (null (psr-variavel-valor psr var-restricao)) (not (equal var-restricao var)))
+                    (return t)
+                  )
+              ) (incf result))
+            )
+          )
+        ))
+        (key-mrv #'(lambda (var)
+          (list-length (psr-variavel-dominio psr var))
+        )))
+        (cond ((= (funcall key-mrv var1) (funcall key-mrv var2)) (> (funcall key-grau var1) (funcall key-grau var2)))
+          (t nil)
+        )
+      )
+    )
+  )
 )
 
 (defun envolvida-restricao (psr var1 var2)
@@ -447,12 +497,12 @@
 )
 
 
-(defun procura-retrocesso-avancada (psr funcao-inferencias)
+(defun procura-retrocesso-avancada (psr funcao-inferencias heuristica)
   (let ((result-num 0)
     (variavel nil)
     (dominios-aux nil))
     (cond ((psr-completo-p psr) (values psr result-num))
-      (t (setf variavel (first (heuristica-mrv psr))) 
+      (t (setf variavel (first (funcall heuristica psr))) 
         (dolist (valor (psr-variavel-dominio psr variavel) (values nil result-num))
           (multiple-value-bind (result-p result-num-aux) (psr-atribuicao-consistente-p psr variavel valor)
             (incf result-num result-num-aux)
@@ -463,7 +513,7 @@
                   (incf result-num result-num-fd)
                   (cond (result-p-fd
                     (setf dominios-aux (altera-dominio psr result-inferencias))
-                    (multiple-value-bind (result-p-proc result-num-proc) (procura-retrocesso-avancada psr funcao-inferencias)
+                    (multiple-value-bind (result-p-proc result-num-proc) (procura-retrocesso-avancada psr funcao-inferencias heuristica)
                       (incf result-num result-num-proc)
                       (cond (result-p-proc (return (values psr result-num)))
                         (t (altera-dominio psr dominios-aux))
@@ -482,18 +532,11 @@
 )
 
 (defun procura-retrocesso-fc-mrv (psr)
-  (procura-retrocesso-avancada psr #'forward-checking)
+  (procura-retrocesso-avancada psr #'forward-checking #'heuristica-mrv)
 )
 
 (defun procura-retrocesso-MAC-mrv (psr)
-  (procura-retrocesso-avancada psr #'MAC)
-)
-
-(defun resolve-simples (array)
-  (multiple-value-bind (psr unwanted) (procura-retrocesso-simples (fill-a-pix->psr array))
-    (declare (ignore unwanted))
-    (psr->fill-a-pix (procura-retrocesso-simples psr) (array-dimension array 0) (array-dimension array 1))
-  )
+  (procura-retrocesso-avancada psr #'MAC #'heuristica-mrv)
 )
 
 (defun nova-restricao-best (linha coluna valor limite-linha limite-coluna)
@@ -571,9 +614,16 @@
   )   
 )
 
-(defun resolve-best (array)
-  (multiple-value-bind (psr unwanted) (procura-retrocesso-simples (fill-a-pix->psr-best array))
+(defun resolve-simples (array)
+  (multiple-value-bind (psr unwanted) (procura-retrocesso-simples (fill-a-pix->psr array))
     (declare (ignore unwanted))
-    (psr->fill-a-pix (procura-retrocesso-fc-mrv psr) (array-dimension array 0) (array-dimension array 1))
+    (psr->fill-a-pix psr (array-dimension array 0) (array-dimension array 1))
+  )
+)
+
+(defun resolve-best (array)
+  (multiple-value-bind (psr unwanted) (procura-retrocesso-avancada (fill-a-pix->psr-best array) #'forward-checking #'heuristica-mrv)
+    (declare (ignore unwanted))
+    (psr->fill-a-pix psr (array-dimension array 0) (array-dimension array 1))
   )
 )
