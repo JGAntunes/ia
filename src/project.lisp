@@ -170,7 +170,7 @@
   )  
 )
 
-;;;;;;;;;;;;;;;;;;;;;;;;REAL_DEAL;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;PSR FUNCS;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun psr-variaveis-nao-atribuidas (p)
   (compara-listas (psr-variaveis-todas p) (psr-atribuicoes p) #'not-lista-pares)
 )
@@ -263,6 +263,7 @@
   )
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;REAL DEAL;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun procura-retrocesso-simples (psr)
   (let ((result-num 0)
     (variavel nil))
@@ -337,9 +338,6 @@
   ) 
 )
 
-<<<<<<< HEAD
-;verifica se a segunda variavel esta envolvida na lista de restricoes da primeira
-=======
 (defun heuristica-mrv-grau (psr)
   (stable-sort (psr-variaveis-nao-atribuidas psr)
     #'(lambda (var1 var2)
@@ -367,7 +365,7 @@
   )
 )
 
->>>>>>> 91b75a195b9d9f9a930e33c5281dd25c78e015ad
+;verifica se a segunda variavel esta envolvida na lista de restricoes da primeira
 (defun envolvida-restricao (psr var1 var2)
   (dolist (restricao (psr-variavel-restricoes psr var1))
     (when (pertence-restricao restricao (list var2)) (return t))
@@ -386,14 +384,15 @@
   )
 )
 
-;
+;dada uma lista de inferencias e um variavel devolve o dominio da respectiva variavel
 (defun inferencia-variavel-dominio (inferencias var)
   (dolist (inferencia inferencias)
     (when (equal var (inferencia-variavel inferencia)) (return (inferencia-dominio inferencia)))
   )
 )
 
-(defun  altera-dominio (psr inferencias)
+;dado um psr e uma lista de inferencias o dominio do psr e alterado
+(defun altera-dominio (psr inferencias)
   (let ((dominios-original nil))
     (dolist (inferencia inferencias)
       (setf dominios-original (append dominios-original (list (cria-inferencia (inferencia-variavel inferencia) (psr-variavel-dominio psr (inferencia-variavel inferencia))))))
@@ -403,6 +402,7 @@
   )
 )
 
+;dada uma variavel, um dominio e uma lista adiciona a respectiva lista uma nova inferencia
 (defun adiciona-inferencia (variavel dominio lista)
   (cond ((null lista) (list (cria-inferencia variavel dominio)))
     ((equal variavel (inferencia-variavel (first lista))) (append (list (cria-inferencia variavel dominio)) (rest lista)))
@@ -443,7 +443,7 @@
   )
 )
 
-;
+;funcao generica responsavel por tratar a criacao de inferencias podendo usar opcionalmente uma funcao axiliar de alteracao de arcos
 (defun funcao-inferencias (psr var funcao-altera-arcos)
   (let ((result-num 0)
     (inferencias nil))
@@ -472,7 +472,7 @@
   (funcao-inferencias psr var nil)
 )
 
-;
+;funcao responsavel por alterar e devolver a lista de arcos de acordo com o MAC
 (defun altera-arcos (arco novos-arcos lista-arcos)
   (setf novos-arcos (remove-lista (list (second arco) (first arco)) novos-arcos))
   (setf lista-arcos (append lista-arcos novos-arcos))
@@ -508,7 +508,7 @@
   )
 )
 
-
+;funcao de procura generica que recebe um psr uma funcao de inferencias e um heuristica
 (defun procura-retrocesso-avancada (psr funcao-inferencias heuristica)
   (let ((result-num 0)
     (variavel nil)
@@ -551,6 +551,7 @@
   (procura-retrocesso-avancada psr #'MAC #'heuristica-mrv)
 )
 
+;reimplimentacao da criacao de restricoes para cobrir os casos limite 0, 9 e ainda 4 e 6 nos limites do mapa
 (defun nova-restricao-best (linha coluna valor limite-linha limite-coluna)
   (let ((lista-vars ())
         (valor-limite nil)
@@ -594,6 +595,7 @@
   )  
 )
 
+;reimplimentacao do fill-a-pix->psr para cobrir os casos limite 0, 9 e ainda 4 e 6 nos limites do mapa
 (defun fill-a-pix->psr-best (array)
   (let ((lista-vars ())
     (lista-restricoes ())
