@@ -4,8 +4,8 @@
 ;Nome: Diogo Rodrigues Numero: 77214
 
 ;;;;;;;;;;;;;;EXEMPLOS;;;;;;;;;;;;;;
-(load "exemplos.fas")
-;(load (compile-file "testes publicos/exemplos.lisp"))
+;(load "exemplos.fas")
+(load (compile-file "testes publicos/exemplos.lisp"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;ESTRUTURAS;;;;;;;;;;;;;
@@ -19,6 +19,12 @@
             (:constructor cria-inferencia (variavel dominio)))
   variavel
   dominio  
+)
+
+(defstruct (atribuicao
+            (:constructor cria-atribuicao (valor variaveis)))
+  valor
+  variaveis  
 )
 
 (defstruct (psr 
@@ -490,14 +496,83 @@
   )
 )
 
-(defun inicia-resolve (psr)
-  (dolist (psr-restricoes psr)
-      
-  )
+(defun nova-restricao-best (linha coluna valor limite-linha limite-coluna)
+  (let ((lista-vars ())
+        (valor-limite nil)
+        (atribuicao 0))
+    (cond ((= valor 0) (setf valor-limite t))
+      ((= valor 9) (setf valor-limite t) (setf atribuicao 1))
+      ((and (= valor 6)
+        (or
+          (= linha 0)
+          (= coluna 0)
+          (= linha (- limite-linha 1))
+          (= coluna (- limite-coluna 1))))
+            (setf valor-limite t)
+            (setf atribuicao 1)
+      )
+      ((and (= valor 4) 
+        (or 
+          (and (= linha 0) (= coluna 0))
+          (and (= linha (- limite-linha 1)) (= coluna 0)) 
+          (and (= linha 0) (= coluna (- limite-coluna 1)))
+          (and (= linha (- limite-linha 1)) (= coluna (- limite-coluna 1))))) 
+            (setf valor-limite t)
+            (setf atribuicao 1)
+      )     
+    )
+    (do ((x  (- linha 1) (incf x)))
+      ((> x (+ linha 1)) nil)
+      (cond ((or (> x  (- limite-linha 1)) (< x 0)) nil)
+        (t (do ((y  (- coluna 1) (incf y)))
+            ((> y (+ coluna 1)) nil)
+            (cond ((or (> y  (- limite-coluna 1)) (< y 0)) nil)
+              (t (setf lista-vars (append lista-vars (list (cria-variavel x y)))))
+            )
+          )
+        )
+      ) 
+    )
+    (cond (valor-limite (values t (cria-atribuicao atribuicao lista-vars)))
+      (t (values nil (cria-restricao lista-vars (cria-predicado valor lista-vars))))
+    )  
+  )  
+)
+
+(defun fill-a-pix->psr-best (array)
+  (let ((lista-vars ())
+    (lista-restricoes ())
+    (lista-dominios ())
+    (lista-atribuicoes ())
+    (limite nil)
+    (psr nil))
+    (dotimes (x (array-dimension array 0))
+      (dotimes (y (array-dimension array 1))
+        (setf lista-vars (append lista-vars (list (cria-variavel x y))))
+        (setf lista-dominios (append lista-dominios (list (list 0 1))))
+        (when (aref array x y)
+          (multiple-value-bind (result-p lista) (nova-restricao-best x y (aref array x y) (array-dimension array 0) (array-dimension array 1))
+            (cond (result-p (setf limite t) (setf lista-atribuicoes (append lista-atribuicoes (list lista))))
+              (t (setf lista-restricoes (append lista-restricoes (list lista))))
+            )
+          )
+        )
+      )
+    )
+    (setf psr (cria-psr lista-vars lista-dominios lista-restricoes))
+    (when limite
+      (dolist (atribuicao lista-atribuicoes)
+        (dolist (var (atribuicao-variaveis atribuicao))
+          (psr-adiciona-atribuicao! psr var (atribuicao-valor atribuicao))
+        )
+      )
+    )
+    (values psr)
+  )   
 )
 
 (defun resolve-best (array)
-  (multiple-value-bind (psr unwanted) (procura-retrocesso-simples (fill-a-pix->psr array))
+  (multiple-value-bind (psr unwanted) (procura-retrocesso-simples (fill-a-pix->psr-best array))
     (declare (ignore unwanted))
     (psr->fill-a-pix (procura-retrocesso-fc-mrv psr) (array-dimension array 0) (array-dimension array 1))
   )
